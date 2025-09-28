@@ -1,0 +1,47 @@
+{
+  "manifest_version": 3,
+  "name": "ESM Auto-Capture",
+  "version": "1.0.0",
+  "description": "Automatically capture AI conversations to Extended Sienna Memory",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "background"
+  ],
+  "host_permissions": [
+    "https://claude.ai/*",
+    "https://chat.openai.com/*",
+    "https://bard.google.com/*",
+    "https://character.ai/*",
+    "https://poe.com/*",
+    "https://www.perplexity.ai/*",
+    "http://localhost:8000/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://claude.ai/*",
+        "https://chat.openai.com/*",
+        "https://bard.google.com/*",
+        "https://character.ai/*",
+        "https://poe.com/*",
+        "https://www.perplexity.ai/*"
+      ],
+      "js": ["content-script.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "ESM Auto-Capture"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

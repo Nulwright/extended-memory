@@ -1,0 +1,61 @@
+### 📁 PATH: docker-compose.yml
+```yaml
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: esm
+      POSTGRES_USER: esm_user
+      POSTGRES_PASSWORD: esm_password
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U esm_user -d esm"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  typesense:
+    image: typesense/typesense:0.24.2
+    environment:
+      TYPESENSE_DATA_DIR: /data
+      TYPESENSE_API_KEY: esm_search_key
+    volumes:
+      - ./data/typesense:/data
+    ports:
+      - "8108:8108"
+    command: '--data-dir /data --api-key=esm_search_key --listen-port 8108 --enable-cors'
+
+  esm-backend:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://esm_user:esm_password@postgres:5432/esm
+      TYPESENSE_URL: http://typesense:8108
+      TYPESENSE_API_KEY: esm_search_key
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      typesense:
+        condition: service_started
+    restart: unless-stopped
+
+  esm-frontend:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      REACT_APP_API_URL: http://localhost:8000
+    depends_on:
+      - esm-backend
