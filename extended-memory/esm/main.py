@@ -5,7 +5,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 import logging
+from logging.handlers import RotatingFileHandler
 import time
+from sqlalchemy import text
 from contextlib import asynccontextmanager
 
 from esm.config import get_settings
@@ -18,33 +20,30 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.FileHandler("logs/esm.log"),
+        RotatingFileHandler("logs/esm.log", maxBytes=10 * 1024 * 1024, backupCount=5),
         logging.StreamHandler()
     ]
 )
 
 logger = logging.getLogger(__name__)
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager"""
     logger.info("🚀 Starting ESM application...")
-    
-    # Create database tables
-    Base.metadata.create_all(bind=engine)
-    logger.info("📊 Database tables created")
-    
+    # Create database tables (handled by migrations)
+    # Base.metadata.create_all(bind=engine)
+    # logger.info("📊 Database tables created")
+
     # Initialize search indices
     from esm.services.search_service import SearchService
     search_service = SearchService()
     await search_service.initialize_indices()
     logger.info("🔍 Search indices initialized")
-    
-    yield
-    
-    logger.info("🛑 Shutting down ESM application...")
 
+    yield
+
+    logger.info("🛑 Shutting down ESM application...")
 
 # Create FastAPI app
 settings = get_settings()
@@ -60,7 +59,7 @@ app = FastAPI(
 # Add middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=settings.allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -68,23 +67,20 @@ app.add_middleware(
 
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=["localhost", "127.0.0.1", "0.0.0.0"]
+    allowed_hosts=settings.allowed_hosts
 )
 
 # Request logging middleware
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     start_time = time.time()
-    
     response = await call_next(request)
-    
     process_time = time.time() - start_time
     logger.info(
         f"{request.method} {request.url.path} - "
         f"Status: {response.status_code} - "
         f"Time: {process_time:.3f}s"
     )
-    
     return response
 
 # Exception handlers
@@ -101,15 +97,22 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     logger.error(f"HTTP Exception: {exc.status_code} - {exc.detail}")
     return JSONResponse(
         status_code=exc.status_code,
-        content={"error": "HTTP Error", "detail": exc.detail}
+        content={"error": "HTTP Error", "detail": "An error occurred"}
     )
 
 # Health check endpoint
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
+    db_ok = True
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+    except Exception:
+        db_ok = False
     return {
-        "status": "healthy",
+        "status": "healthy" if db_ok else "unhealthy",
+        "database": db_ok,
         "version": "1.0.0",
         "timestamp": time.time()
     }
