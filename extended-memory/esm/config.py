@@ -40,8 +40,21 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO", description="Logging level")
     
     # Server
+         
+
+
     host: str = Field(default="0.0.0.0", description="Server host")
     port: int = Field(default=8000, description="Server port")
+        # Security
+    allowed_origins: list[str] = Field(
+        default=["http://localhost", "http://localhost:3000"],
+        description="List of origins allowed by CORS"
+    )
+    allowed_hosts: list[str] = Field(
+        default=["localhost", "127.0.0.1"],
+        description="List of hosts allowed by TrustedHostMiddleware"
+    )
+
     
     # Memory Settings
     max_memory_size: int = Field(
@@ -64,6 +77,9 @@ class Settings(BaseSettings):
     )
     
     class Config:
+    
+
+
         env_file = ".env"
         case_sensitive = False
 
